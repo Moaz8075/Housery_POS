@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -18,12 +18,18 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { categories, brands, itemTypes, sizes } from "@/lib/data-store"
 import { Plus } from "lucide-react"
+import { Brand, Category, getBrands, getCategories, getItemTypes, getSizes, ItemType, Size } from "@/lib/dataProvider"
 
 interface AddStockDialogProps {
   onAdd?: (data: any) => void
 }
 
 export function AddStockDialog({ onAdd }: AddStockDialogProps) {
+
+  const [categories, setCategories] = useState<Category[]>([])
+  const [brands, setBrands] = useState<Brand[]>([])
+  const [itemTypes, setItemTypes] = useState<ItemType[]>([])
+  const [sizes, setSizes] = useState<Size[]>([])
   const [open, setOpen] = useState(false)
   const [categoryId, setCategoryId] = useState("")
   const [brandId, setBrandId] = useState("")
@@ -33,8 +39,27 @@ export function AddStockDialog({ onAdd }: AddStockDialogProps) {
   const [pricePerDozen, setPricePerDozen] = useState("")
   const [lowStockThreshold, setLowStockThreshold] = useState("10")
 
-  const filteredBrands = brands.filter((b) => b.categoryId === categoryId)
-  const filteredTypes = itemTypes.filter((t) => t.brandId === brandId)
+  useEffect(() => {
+    const loadAll = async () => {
+      try {
+        const [cat, br, ty, si] = await Promise.all([
+          getCategories(),
+          getBrands(),
+          getItemTypes(),
+          getSizes()
+        ])
+
+        setCategories(cat)
+        setBrands(br)
+        setItemTypes(ty)
+        setSizes(si)
+      } catch (error) {
+        console.error("Failed to load dropdown data:", error)
+      }
+    }
+
+    loadAll()
+  }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,7 +67,6 @@ export function AddStockDialog({ onAdd }: AddStockDialogProps) {
     const pricePerPiece = Math.round(Number(pricePerDozen) / 12)
 
     const newItem = {
-      id: `stock-${Date.now()}`,
       categoryId,
       brandId,
       typeId,
@@ -92,7 +116,7 @@ export function AddStockDialog({ onAdd }: AddStockDialogProps) {
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
+                      <SelectItem key={cat._id} value={cat._id}>
                         {cat.name}
                       </SelectItem>
                     ))}
@@ -107,8 +131,8 @@ export function AddStockDialog({ onAdd }: AddStockDialogProps) {
                     <SelectValue placeholder="Select brand" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredBrands.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id}>
+                    {brands.map((brand) => (
+                      <SelectItem key={brand._id} value={brand._id}>
                         {brand.name}
                       </SelectItem>
                     ))}
@@ -125,8 +149,8 @@ export function AddStockDialog({ onAdd }: AddStockDialogProps) {
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredTypes.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
+                    {itemTypes.map((type) => (
+                      <SelectItem key={type._id} value={type._id}>
                         {type.name}
                       </SelectItem>
                     ))}
@@ -142,7 +166,7 @@ export function AddStockDialog({ onAdd }: AddStockDialogProps) {
                   </SelectTrigger>
                   <SelectContent>
                     {sizes.map((size) => (
-                      <SelectItem key={size.id} value={size.id}>
+                      <SelectItem key={size._id} value={size._id}>
                         {size.name}
                       </SelectItem>
                     ))}

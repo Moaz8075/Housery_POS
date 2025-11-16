@@ -1,28 +1,23 @@
-const Supplier = require('../models/Supplier');
-const asyncHandler = require('../middleware/asyncHandler');
+import Supplier from "../models/Supplier.js";
+import asyncHandler from "../middleware/asyncHandler.js";
 
-exports.getSuppliers = asyncHandler(async (req, res) => {
-  const { q, page=1, limit=50 } = req.query;
-  const filter = {};
-  if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { contactName: new RegExp(q, 'i') }];
-  const suppliers = await Supplier.find(filter).skip((page-1)*limit).limit(Number(limit));
-  const total = await Supplier.countDocuments(filter);
-  res.json({ suppliers, total });
+export const getSuppliers = asyncHandler(async (req, res) => {
+  const items = await Supplier.find().sort({ createdAt: -1 });
+  const total = await Supplier.countDocuments();
+  res.json({ suppliers: items, total });
 });
 
-exports.createSupplier = asyncHandler(async (req,res) => {
-  const supplier = await Supplier.create(req.body);
-  res.status(201).json(supplier);
+export const createSupplier = asyncHandler(async (req, res) => {
+  const s = await Supplier.create(req.body);
+  res.status(201).json(s);
 });
 
-exports.updateSupplier = asyncHandler(async (req,res) => {
-  const supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  if (!supplier) { res.status(404); throw new Error('Supplier not found'); }
-  res.json(supplier);
+export const updateSupplier = asyncHandler(async (req, res) => {
+  const updated = await Supplier.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  res.json(updated);
 });
 
-exports.deleteSupplier = asyncHandler(async (req,res) => {
-  const supplier = await Supplier.findByIdAndDelete(req.params.id);
-  if (!supplier) { res.status(404); throw new Error('Supplier not found'); }
-  res.json({ message: 'Supplier deleted' });
+export const deleteSupplier = asyncHandler(async (req, res) => {
+  await Supplier.findByIdAndDelete(req.params.id);
+  res.status(204).end();
 });

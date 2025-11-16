@@ -15,9 +15,10 @@ export function AlertItem({ alert, onClick }: AlertItemProps) {
     info: Info,
     warning: AlertTriangle,
     error: AlertCircle,
+    danger: AlertCircle,
   }
 
-  const Icon = icons[alert.severity]
+  const Icon = icons[alert?.severity]
 
   return (
     <Alert

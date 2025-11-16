@@ -1,7 +1,6 @@
 "use client"
 
-import { useState } from "react"
-import type { Supplier } from "@/lib/types"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -10,48 +9,86 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
 import { Phone, Store, CreditCard, Package, Plus } from "lucide-react"
+import { createTransaction, getTransactionsByType, Supplier, Transaction, updateSupplier } from "@/lib/dataProvider"
 
 interface SupplierDetailsDialogProps {
-  supplier: Supplier | null
+  supplier: Supplier | null;
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSupplierUpdate: () => void
 }
 
-export function SupplierDetailsDialog({ supplier, open, onOpenChange }: SupplierDetailsDialogProps) {
+export function SupplierDetailsDialog({ supplier, open, onOpenChange, onSupplierUpdate }: SupplierDetailsDialogProps) {
   const [paymentAmount, setPaymentAmount] = useState("")
   const [purchaseAmount, setPurchaseAmount] = useState("")
   const [purchaseNote, setPurchaseNote] = useState("")
   const [activeTab, setActiveTab] = useState("overview")
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loadingTransactions, setLoadingTransactions] = useState(false)
 
-  if (!supplier) return null
+  const fetchTransactions = async () => {
+    if(!supplier) return
+    setLoadingTransactions(true)
+    try {
+      const res = await getTransactionsByType(supplier._id, "supplier")
+      setTransactions(res || [])
+    } catch (err) {
+      console.error("Failed to fetch transactions:", err)
+    } finally {
+      setLoadingTransactions(false)
+    }
+  }
+  useEffect(() => {
+    if (!open) return
 
-  const handleMakePayment = () => {
-    if (Number(paymentAmount) > 0 && Number(paymentAmount) <= supplier.pendingPayment) {
-      console.log("[v0] Payment made to supplier:", {
-        supplierId: supplier.id,
+    fetchTransactions()
+  }, [supplier?._id, open])
+
+
+
+  const handleMakePayment = async () => {
+    if (!supplier) return
+    if (Number(paymentAmount) > 0 && Number(paymentAmount) <= supplier.totalPurchases - supplier.paidPayment) {
+      await updateSupplier(supplier._id, {
+        paidPayment: supplier.paidPayment + Number(paymentAmount),
+      })
+      await createTransaction({
+        type: "paymentPaid",
+        supplierId: supplier._id,
         amount: Number(paymentAmount),
       })
+      onSupplierUpdate?.()
       setPaymentAmount("")
       setActiveTab("overview")
+      fetchTransactions()
       onOpenChange(false)
     }
   }
 
-  const handleRecordPurchase = () => {
+  const handleRecordPurchase = async () => {
+    if (!supplier) return
     if (Number(purchaseAmount) > 0) {
-      console.log("[v0] Purchase recorded:", {
-        supplierId: supplier.id,
-        amount: Number(purchaseAmount),
-        note: purchaseNote,
+       await updateSupplier(supplier._id, {
+        totalPurchases: supplier.totalPurchases + Number(purchaseAmount),
       })
+      await createTransaction({
+        type: "purchase",
+        supplierId: supplier._id,
+        amount: Number(purchaseAmount),
+        note: purchaseNote
+      })
+      onSupplierUpdate?.()
       setPurchaseAmount("")
       setPurchaseNote("")
       setActiveTab("overview")
+      fetchTransactions()
       onOpenChange(false)
     }
   }
 
+  if (!supplier) return null
   const initials = supplier.name
     .split(" ")
     .map((n) => n[0])
@@ -106,8 +143,8 @@ export function SupplierDetailsDialog({ supplier, open, onOpenChange }: Supplier
                 <CreditCard className="h-4 w-4" />
                 <span className="text-sm">Pending Payment</span>
               </div>
-              <p className={`text-2xl font-bold ${supplier.pendingPayment > 0 ? "text-red-600" : "text-green-600"}`}>
-                Rs. {supplier.pendingPayment.toLocaleString()}
+              <p className={`text-2xl font-bold ${supplier.totalPurchases - supplier.paidPayment > 0 ? "text-red-600" : "text-green-600"}`}>
+                Rs. {(supplier.totalPurchases - supplier.paidPayment).toLocaleString()}
               </p>
             </div>
           </div>
@@ -126,7 +163,7 @@ export function SupplierDetailsDialog({ supplier, open, onOpenChange }: Supplier
               <div className="text-center py-8">
                 <p className="text-muted-foreground">Use the tabs above to make payments or record new purchases</p>
                 <div className="flex gap-2 justify-center mt-4">
-                  {supplier.pendingPayment > 0 && (
+                  {supplier.totalPurchases - supplier.paidPayment > 0 && (
                     <Button onClick={() => setActiveTab("payment")}>
                       <CreditCard className="mr-2 h-4 w-4" />
                       Make Payment
@@ -150,19 +187,19 @@ export function SupplierDetailsDialog({ supplier, open, onOpenChange }: Supplier
                       id="payment"
                       type="number"
                       min="0"
-                      max={supplier.pendingPayment}
+                      max={supplier.totalPurchases - supplier.paidPayment}
                       value={paymentAmount}
                       onChange={(e) => setPaymentAmount(e.target.value)}
                       placeholder="Enter amount"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Pending: Rs. {supplier.pendingPayment.toLocaleString()}
+                      Pending: Rs. {(supplier.totalPurchases - supplier.paidPayment).toLocaleString()}
                     </p>
                   </div>
                   <Button
                     onClick={handleMakePayment}
                     disabled={
-                      !paymentAmount || Number(paymentAmount) <= 0 || Number(paymentAmount) > supplier.pendingPayment
+                      !paymentAmount || Number(paymentAmount) <= 0 || Number(paymentAmount) > (supplier.totalPurchases - supplier.paidPayment)
                     }
                     className="w-full"
                   >
@@ -208,6 +245,56 @@ export function SupplierDetailsDialog({ supplier, open, onOpenChange }: Supplier
               </div>
             </TabsContent>
           </Tabs>
+
+            {/* Transaction History */}
+          <div>
+            <h4 className="font-semibold mb-3">Transaction History</h4>
+            {loadingTransactions ? (
+              <p className="text-center text-muted-foreground py-8">Loading transactions...</p>
+            ) : transactions.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No transactions yet</p>
+            ) : (
+              <div className="space-y-3">
+                {transactions.map((transaction) => (
+                  <div key={transaction._id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <Badge
+                          className={
+                            transaction.type === "sale" || transaction.type === "paymentReceive"
+                              ? "bg-green-100 text-green-800 hover:bg-green-100"
+                              : "bg-blue-100 text-blue-800 hover:bg-blue-100"
+                          }
+                        >
+                          {transaction.type === "sale"
+                            ? "Sale"
+                            : transaction.type === "paymentReceive"
+                              ? "Payment Received"
+                              : transaction.type === "paymentPaid"
+                                ? "Payment Paid"
+                                : "Purchase"}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {transaction.createdAt
+                            ? new Date(transaction.createdAt).toLocaleDateString()
+                            : "-"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">Rs. {transaction.amount.toLocaleString()}</p>
+                        {transaction.amountPending && transaction.amountPending > 0 && (
+                          <p className="text-xs text-orange-600">
+                            Pending: Rs. {transaction.amountPending.toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {transaction.note && <p className="text-sm font-semibold mt-2">{transaction.note}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

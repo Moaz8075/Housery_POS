@@ -1,136 +1,139 @@
-const Sale = require("../models/Sale");
-const StockItem = require("../models/StockItem");
-const asyncHandler = require("../middleware/asyncHandler");
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
+import Sale from "../models/Sale.js";
+import Transaction from "../models/Transaction.js";
+import Customer from "../models/Customer.js";
+import StockItem from "../models/StockItem.js";
+import asyncHandler from "../middleware/asyncHandler.js";
 
-// GET /api/sales
-exports.getSales = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 50 } = req.query;
-
+export const getSales = asyncHandler(async (req, res) => {
+  const page = Number(req.query.page || 1);
+  const limit = Number(req.query.limit || 50);
   const sales = await Sale.find()
     .sort({ createdAt: -1 })
     .skip((page - 1) * limit)
-    .limit(Number(limit));
+    .limit(limit)
+    .populate("customer")
+    .populate({
+      path: "items.item",
+      populate: [
+        { path: "categoryId", select: "name" },
+        { path: "brandId", select: "name" },
+        { path: "typeId", select: "name" },
+        { path: "sizeId", select: "name" }
+      ]
+    });
 
   const total = await Sale.countDocuments();
   res.json({ sales, total });
 });
 
-// GET /api/sales/:id
-exports.getSale = asyncHandler(async (req, res) => {
-  const sale = await Sale.findById(req.params.id).populate("items.item");
+export const getSale = asyncHandler(async (req, res) => {
+  const sale = await Sale.findById(req.params.id)
+    .populate("customer")
+    .populate({
+      path: "items.item",
+      populate: [
+        { path: "categoryId", select: "name" },
+        { path: "brandId", select: "name" },
+        { path: "typeId", select: "name" },
+        { path: "sizeId", select: "name" }
+      ]
+    });
 
   if (!sale) {
     res.status(404);
     throw new Error("Sale not found");
   }
-
   res.json(sale);
 });
 
-// POST /api/sales -> create sale and decrement stock
-exports.createSale = asyncHandler(async (req, res) => {
-  const { invoiceNo, items, tax = 0, discount = 0, payment, createdBy } = req.body;
+export const createSale = asyncHandler(async (req, res) => {
+  const {
+    customer,
+    items,
+    total,
+    tax = 0,
+    discount = 0,
+    paidAmount = 0,
+    paymentMethod = "cash",
+    status = "completed",
+    createdBy
+  } = req.body;
 
-  if (!invoiceNo || !items || !items.length) {
-    res.status(400);
-    throw new Error("Invoice number and items are required");
+  if (!items || !items.length) {
+    return res.status(400).json({ message: "items are required" });
   }
-
-  const session = await mongoose.startSession();
-  session.startTransaction();
 
   try {
-    let total = 0;
-    const saleItems = [];
+    // 1. Create Sale
+    const saleDoc = await Sale.create({
+      customer,
+      items,
+      total,
+      tax,
+      discount,
+      paidAmount,
+      paymentMethod,
+      status,
+      createdBy
+    });
 
-    for (const it of items) {
-      const dbItem = await StockItem.findById(it.item).session(session);
+    // 2. Create Transaction
+    await Transaction.create({
+      type: "sale",
+      customerId: customer || undefined,
+      sale: saleDoc._id,
+      amount: total,
+      amountPaid: paidAmount,
+      amountPending: Math.max(total - paidAmount, 0),
+      createdBy
+    });
 
-      if (!dbItem) {
-        throw new Error(`StockItem ${it.item} not found`);
-      }
-
-      // Ensure sufficient stock
-      const stockQty = dbItem.quantityInDozen ?? dbItem.quantity ?? 0;
-      if (stockQty < it.quantity) {
-        throw new Error(`Insufficient stock for ${dbItem.name || dbItem._id}`);
-      }
-
-      const unitPrice =
-        it.unitPrice || dbItem.pricePerDozen || dbItem.pricePerPiece || 0;
-      const subtotal = unitPrice * it.quantity - (it.discount || 0);
-      total += subtotal;
-
-      saleItems.push({
-        item: dbItem._id,
-        sku: dbItem.sku || "",
-        name: dbItem.name || "",
-        unitPrice,
-        quantity: it.quantity,
-        discount: it.discount || 0,
-        subtotal,
+    // 3. Update customer totals
+    if (customer) {
+      await Customer.findByIdAndUpdate(customer, {
+        $inc: {
+          totalPurchases: total,
+          pendingPayment: Math.max(total - paidAmount, 0)
+        }
       });
-
-      // Decrement stock
-      if (dbItem.quantityInDozen !== undefined)
-        dbItem.quantityInDozen -= it.quantity;
-      else dbItem.quantity -= it.quantity;
-
-      await dbItem.save({ session });
     }
 
-    // Apply tax and discount
-    total = total + Number(tax) - Number(discount || 0);
+    // 4. Update stock quantities
+    for (const it of items) {
+      await StockItem.findByIdAndUpdate(it.item, {
+        $inc: { quantityInDozen: -Math.abs(it.quantity) }
+      });
+    }
 
-    const sale = await Sale.create(
-      [
-        {
-          invoiceNo,
-          items: saleItems,
-          tax,
-          discount,
-          total,
-          paidAmount: payment?.amount || 0,
-          paymentMethod: payment?.method || "cash",
-          status: "completed",
-          createdBy,
-        },
-      ],
-      { session }
-    );
+    // 5. Populate sale before sending response
+    const populatedSale = await Sale.findById(saleDoc._id)
+      .populate("customer")
+      .populate({
+        path: "items.item",
+        populate: [
+          { path: "categoryId", select: "name" },
+          { path: "brandId", select: "name" },
+          { path: "typeId", select: "name" },
+          { path: "sizeId", select: "name" }
+        ]
+      });
 
-    await session.commitTransaction();
-    session.endSession();
+    res.status(201).json(populatedSale);
 
-    res.status(201).json(sale[0]);
   } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
-    throw err;
+    console.error("Error creating sale:", err);
+    res.status(500).json({ message: "Failed to create sale", error: err.message });
   }
 });
 
-// PUT /api/sales/:id
-exports.updateSale = asyncHandler(async (req, res) => {
-  const sale = await Sale.findByIdAndUpdate(req.params.id, req.body, { new: true });
 
-  if (!sale) {
-    res.status(404);
-    throw new Error("Sale not found");
-  }
-
-  res.json(sale);
+export const updateSale = asyncHandler(async (req, res) => {
+  const updated = await Sale.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  res.json(updated);
 });
 
-// DELETE /api/sales/:id
-exports.deleteSale = asyncHandler(async (req, res) => {
-  const sale = await Sale.findByIdAndDelete(req.params.id);
-
-  if (!sale) {
-    res.status(404);
-    throw new Error("Sale not found");
-  }
-
-  res.json({ message: "Sale deleted" });
+export const deleteSale = asyncHandler(async (req, res) => {
+  await Sale.findByIdAndDelete(req.params.id);
+  res.status(204).end();
 });

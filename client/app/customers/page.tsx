@@ -1,10 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { CustomerCard } from "@/components/customers/customer-card"
 import { CustomerDetailsDialog } from "@/components/customers/customer-details-dialog"
-import { customers } from "@/lib/data-store"
-import type { Customer } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -12,13 +10,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, Users, AlertCircle, TrendingUp, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { AddCustomerDialog } from "@/components/customers/add-customer-dialog"
+import { Customer, getCustomers } from "@/lib/dataProvider"
 
 export default function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [refreshKey, setRefreshKey] = useState(0);
+   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+      const fetchCustomers= async () => {
+        try {
+          const customers = await getCustomers()
+          
+          setCustomers(customers)
+        } catch (err) {
+          console.error("Failed to fetch customers:", err)
+        } finally {
+          setLoading(false)
+        }
+      }
+      fetchCustomers()
+    }, [refreshKey])
 
   const filteredCustomers = customers.filter((customer) => {
     const matchesSearch =
@@ -37,6 +53,8 @@ export default function CustomersPage() {
   const totalCustomers = customers.length
   const customersWithPending = customers.filter((c) => c.pendingPayment > 0).length
   const totalPendingAmount = customers.reduce((sum, c) => sum + c.pendingPayment, 0)
+
+  if (loading) return <p className="p-4">Loading stock items...</p>
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
@@ -124,7 +142,7 @@ export default function CustomersPage() {
           <div className="col-span-full text-center py-12 text-muted-foreground">No customers found</div>
         ) : (
           filteredCustomers.map((customer) => (
-            <CustomerCard key={customer.id} customer={customer} onClick={() => setSelectedCustomer(customer)} />
+            <CustomerCard key={customer._id} customer={customer} onClick={() => setSelectedCustomer(customer)} />
           ))
         )}
       </div>
@@ -134,6 +152,7 @@ export default function CustomersPage() {
         customer={selectedCustomer}
         open={!!selectedCustomer}
         onOpenChange={(open) => !open && setSelectedCustomer(null)}
+        onCustomerUpdate={() => setRefreshKey((k) => k + 1)}
       />
 
       {/* AddCustomerDialog component */}

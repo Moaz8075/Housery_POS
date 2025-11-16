@@ -1,64 +1,48 @@
-import StockItem from "../models/StockItem.js"
-import Payment from "../models/Payment.js"
-import Transaction from "../models/Transaction.js"
+import Sale from "../models/Sale.js";
+import StockItem from "../models/StockItem.js";
+import Transaction from "../models/Transaction.js";
+import asyncHandler from "../middleware/asyncHandler.js";
+import Supplier from "../models/Supplier.js";
 
-export const getDashboardStats = async (req, res) => {
-  try {
-    // --- Low Stock ---
-    const lowStockItems = await StockItem.countDocuments({
-      $expr: { $lt: ["$quantityInDozen", "$lowStockThreshold"] },
-    })
+export const getDashboard = asyncHandler(async (req, res) => {
+  const startOfToday = new Date();
+  startOfToday.setHours(0,0,0,0);
 
-    // --- Payments ---
-    const payments = await Payment.find()
-    const overduePayments = payments.filter(
-      (p) => new Date(p.dueDate) < new Date() && p.status !== "paid"
-    )
-    const upcomingPayments = payments.filter(
-      (p) =>
-        new Date(p.dueDate) >= new Date() &&
-        (p.status === "pending" || p.status === "partial")
-    )
+  const startOfMonth = new Date(startOfToday.getFullYear(), startOfToday.getMonth(), 1);
 
-    const pendingReceivables = payments
-      .filter((p) => p.type === "receivable")
-      .reduce((acc, p) => acc + (p.amountPending || 0), 0)
+  const totalSalesToday = await Sale.aggregate([
+    { $match: { createdAt: { $gte: startOfToday } } },
+    { $group: { _id: null, total: { $sum: "$total" } } }
+  ]);
+  const totalSalesThisMonth = await Sale.aggregate([
+    { $match: { createdAt: { $gte: startOfMonth } } },
+    { $group: { _id: null, total: { $sum: "$total" } } }
+  ]);
 
-    const pendingPayables = payments
-      .filter((p) => p.type === "payable")
-      .reduce((acc, p) => acc + (p.amountPending || 0), 0)
+  const lowStockItemsCount = await StockItem.countDocuments({ $expr: { $lte: ["$quantityInDozen", "$lowStockThreshold"] } });
 
-    // --- Sales (Transactions) ---
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+  const pendingReceivables = await Transaction.aggregate([
+    { $match: { type: "sale", amountPending: { $gt: 0 } } },
+    { $group: { _id: null, total: { $sum: "$amountPending" } } }
+  ]);
 
-    const sales = await Transaction.find({ type: "sale" })
+  const suppliers = await Supplier.find({}, "totalPurchases paidPayment");
 
-    const totalSalesToday = sales
-      .filter((s) => new Date(s.createdAt) >= today)
-      .reduce((acc, s) => acc + (s.amount || 0), 0)
+  const pendingPayables = suppliers.reduce((acc, s) => {
+    const pending = (s.totalPurchases || 0) - (s.paidPayment || 0);
+    return acc + Math.max(pending, 0);
+  }, 0);
 
-    const currentMonth = today.getMonth()
-    const totalSalesThisMonth = sales
-      .filter(
-        (s) =>
-          new Date(s.createdAt).getMonth() === currentMonth &&
-          new Date(s.createdAt).getFullYear() === today.getFullYear()
-      )
-      .reduce((acc, s) => acc + (s.amount || 0), 0)
+  const overduePaymentsCount = await Transaction.countDocuments({ type: "sale", amountPending: { $gt: 0 }, dueDate: { $lte: new Date() } });
+  const upcomingPaymentsCount = await Transaction.countDocuments({ type: "purchase", dueDate: { $gte: new Date() } });
 
-    // --- Response ---
-    res.json({
-      totalSalesToday,
-      totalSalesThisMonth,
-      lowStockItemsCount: lowStockItems,
-      overduePaymentsCount: overduePayments.length,
-      upcomingPaymentsCount: upcomingPayments.length,
-      pendingReceivables,
-      pendingPayables,
-    })
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ message: "Error fetching dashboard stats" })
-  }
-}
+  res.json({
+    totalSalesToday: (totalSalesToday[0] && totalSalesToday[0].total) || 0,
+    totalSalesThisMonth: (totalSalesThisMonth[0] && totalSalesThisMonth[0].total) || 0,
+    lowStockItemsCount,
+    overduePaymentsCount,
+    upcomingPaymentsCount,
+    pendingReceivables: (pendingReceivables[0] && pendingReceivables[0].total) || 0,
+    pendingPayables
+  });
+});

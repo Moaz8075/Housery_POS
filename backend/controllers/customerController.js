@@ -1,35 +1,22 @@
-const Customer = require('../models/Customer');
-const asyncHandler = require('../middleware/asyncHandler');
+import Customer from "../models/Customer.js";
+import asyncHandler from "../middleware/asyncHandler.js";
 
-exports.getCustomers = asyncHandler(async (req, res) => {
-  const { q, page = 1, limit = 50 } = req.query;
-  const filter = {};
-  if (q) filter.$or = [{ name: new RegExp(q, 'i') }, { phone: new RegExp(q, 'i') }, { email: new RegExp(q, 'i') }];
-  const customers = await Customer.find(filter).skip((page - 1) * limit).limit(Number(limit));
-  const total = await Customer.countDocuments(filter);
-  res.json({ customers, total, page: Number(page) });
+export const getCustomers = asyncHandler(async (req, res) => {
+  const items = await Customer.find().sort({ createdAt: -1 });
+  res.json(items);
 });
 
-exports.getCustomer = asyncHandler(async (req, res) => {
-  const customer = await Customer.findById(req.params.id);
-  if (!customer) { res.status(404); throw new Error('Customer not found'); }
-  res.json(customer);
+export const createCustomer = asyncHandler(async (req, res) => {
+  const c = await Customer.create(req.body);
+  res.status(201).json(c);
 });
 
-exports.createCustomer = asyncHandler(async (req, res) => {
-  const data = req.body;
-  const customer = await Customer.create(data);
-  res.status(201).json(customer);
+export const updateCustomer = asyncHandler(async (req, res) => {
+  const updated = await Customer.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  res.json(updated);
 });
 
-exports.updateCustomer = asyncHandler(async (req, res) => {
-  const customer = await Customer.findByIdAndUpdate(req.params.id, req.body, { new: true });
-  if (!customer) { res.status(404); throw new Error('Customer not found'); }
-  res.json(customer);
-});
-
-exports.deleteCustomer = asyncHandler(async (req, res) => {
-  const customer = await Customer.findByIdAndDelete(req.params.id);
-  if (!customer) { res.status(404); throw new Error('Customer not found'); }
-  res.json({ message: 'Customer removed' });
+export const deleteCustomer = asyncHandler(async (req, res) => {
+  await Customer.findByIdAndDelete(req.params.id);
+  res.status(204).end();
 });

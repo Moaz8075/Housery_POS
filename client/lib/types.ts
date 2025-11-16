@@ -81,6 +81,8 @@ export interface SaleItem {
   pricePerDozen: number
   pricePerPiece: number
   totalAmount: number
+  name: string
+  subtotal: number
 }
 
 export interface Payment {

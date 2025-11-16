@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import type { Customer } from "@/lib/types"
+import { useState, useEffect } from "react"
+import { createTransaction, updateCustomer, type Customer, getTransactionsByType, type Transaction } from "@/lib/dataProvider"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -11,35 +11,59 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Phone, Store, CreditCard, Package } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
-import { transactions } from "@/lib/data-store"
 
 interface CustomerDetailsDialogProps {
   customer: Customer | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCustomerUpdate: () => void
 }
 
-export function CustomerDetailsDialog({ customer, open, onOpenChange }: CustomerDetailsDialogProps) {
-  const [paymentAmount, setPaymentAmount] = useState("")
+export function CustomerDetailsDialog({ customer, open, onOpenChange, onCustomerUpdate }: CustomerDetailsDialogProps) {
+  const [paymentAmount, setPaymentAmount] = useState('')
   const [showPaymentForm, setShowPaymentForm] = useState(false)
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [loadingTransactions, setLoadingTransactions] = useState(false)
 
-  if (!customer) return null
 
-  const customerTransactions = transactions.filter((t) => t.customerId === customer.id)
+  // Fetch transactions for this customer
+  useEffect(() => {
+    if (!open || !customer) return
 
-  const handleReceivePayment = () => {
+    const fetchTransactions = async () => {
+      setLoadingTransactions(true)
+      try {
+        const res = await getTransactionsByType(customer._id, "customer")
+        setTransactions(res || [])
+      } catch (err) {
+        console.error("Failed to fetch transactions:", err)
+      } finally {
+        setLoadingTransactions(false)
+      }
+    }
+
+    fetchTransactions()
+  }, [customer?._id, open])
+
+  const handleReceivePayment = async () => {
+    if (!customer) return
     if (Number(paymentAmount) > 0 && Number(paymentAmount) <= customer.pendingPayment) {
-      console.log("[v0] Payment received:", {
-        customerId: customer.id,
+      await createTransaction({
+        type: "paymentReceive",
+        customerId: customer._id,
         amount: Number(paymentAmount),
       })
-      setPaymentAmount("")
+      await updateCustomer(customer._id, {
+        pendingPayment: customer.pendingPayment - Number(paymentAmount),
+      })
+      onCustomerUpdate?.()
+      setPaymentAmount('')
       setShowPaymentForm(false)
-      // Reset dialog
       onOpenChange(false)
     }
   }
 
+  if (!customer) return null
   const initials = customer.name
     .split(" ")
     .map((n) => n[0])
@@ -139,7 +163,7 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
                       variant="outline"
                       onClick={() => {
                         setShowPaymentForm(false)
-                        setPaymentAmount("")
+                        setPaymentAmount('')
                       }}
                     >
                       Cancel
@@ -155,30 +179,40 @@ export function CustomerDetailsDialog({ customer, open, onOpenChange }: Customer
           {/* Transaction History */}
           <div>
             <h4 className="font-semibold mb-3">Transaction History</h4>
-            {customerTransactions.length === 0 ? (
+            {loadingTransactions ? (
+              <p className="text-center text-muted-foreground py-8">Loading transactions...</p>
+            ) : transactions.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No transactions yet</p>
             ) : (
               <div className="space-y-3">
-                {customerTransactions.map((transaction) => (
-                  <div key={transaction.id} className="border rounded-lg p-4">
+                {transactions.map((transaction) => (
+                  <div key={transaction._id} className="border rounded-lg p-4">
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <Badge
                           className={
-                            transaction.type === "sale"
+                            transaction.type === "sale" || transaction.type === "paymentReceive"
                               ? "bg-green-100 text-green-800 hover:bg-green-100"
                               : "bg-blue-100 text-blue-800 hover:bg-blue-100"
                           }
                         >
-                          {transaction.type === "sale" ? "Sale" : "Payment Received"}
+                          {transaction.type === "sale"
+                            ? "Sale"
+                            : transaction.type === "paymentReceive"
+                              ? "Payment Received"
+                              : transaction.type === "paymentPaid"
+                                ? "Payment Paid"
+                                : "Purchase"}
                         </Badge>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {formatDistanceToNow(transaction.createdAt, { addSuffix: true })}
+                          {transaction.createdAt
+                            ? new Date(transaction.createdAt).toLocaleDateString()
+                            : "-"}
                         </p>
                       </div>
                       <div className="text-right">
                         <p className="font-semibold">Rs. {transaction.amount.toLocaleString()}</p>
-                        {transaction.amountPending > 0 && (
+                        {transaction.amountPending && transaction.amountPending > 0 && (
                           <p className="text-xs text-orange-600">
                             Pending: Rs. {transaction.amountPending.toLocaleString()}
                           </p>

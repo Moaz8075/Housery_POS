@@ -1,10 +1,11 @@
 "use client"
 
-import type { SaleItem } from "@/lib/types"
-import { getStockItemDisplay, stockItems } from "@/lib/data-store"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Trash2, ShoppingCart } from "lucide-react"
+import { getStockItems, SaleItem, StockItem } from "@/lib/dataProvider"
+import { useEffect, useState } from "react"
+import { getStockItemDisplay } from "@/lib/data-store"
 
 interface CartProps {
   items: (SaleItem & { id: string })[]
@@ -13,8 +14,22 @@ interface CartProps {
 }
 
 export function Cart({ items, onRemoveItem, onClearCart }: CartProps) {
-  const subtotal = items.reduce((sum, item) => sum + item.totalAmount, 0)
-  const totalPieces = items.reduce((sum, item) => sum + item.quantityInDozen * 12, 0)
+  const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0)
+  const totalPieces = items.reduce((sum, item) => sum + item.quantity * 12, 0)
+  const [stockItems, setStockItems] = useState<StockItem[]>([])
+
+  // Fetch stock items on mount
+  useEffect(() => {
+    async function loadStockItems() {
+      try {
+        const data = await getStockItems()
+        setStockItems(data)
+      } catch (error) {
+        console.error("Failed to fetch stock items", error)
+      }
+    }
+    loadStockItems()
+  }, [])
 
   return (
     <Card className="h-full flex flex-col">
@@ -47,13 +62,16 @@ export function Cart({ items, onRemoveItem, onClearCart }: CartProps) {
           <>
             <div className="flex-1 space-y-3 overflow-y-auto mb-4">
               {items.map((item) => {
-                const stockItem = stockItems.find((s) => s.id === item.stockItemId)
-                if (!stockItem) return null
+                // const stockItem = typeof item.item === "object" && item.item !== null
+                //   ? stockItems.find((s) => s._id === item.item._id) // if item.item is populated
+                //   : stockItems.find((s) => s._id === item.item)     // if item.item is just an ID string
+
+                // if (!stockItem) return null
 
                 return (
                   <div key={item.id} className="border rounded-lg p-3">
                     <div className="flex justify-between items-start mb-2">
-                      <p className="font-medium text-sm flex-1">{getStockItemDisplay(stockItem)}</p>
+                      <p className="font-medium text-sm flex-1">{getStockItemDisplay(item.item)}</p>
                       <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onRemoveItem(item.id)}>
                         <Trash2 className="h-4 w-4 text-red-600" />
                       </Button>
@@ -61,12 +79,12 @@ export function Cart({ items, onRemoveItem, onClearCart }: CartProps) {
                     <div className="space-y-1 text-xs">
                       <div className="flex justify-between text-muted-foreground">
                         <span>
-                          {item.quantityInDozen} dozen × Rs. {item.pricePerDozen.toLocaleString()}
+                          {item.quantity} dozen × Rs. {item.unitPrice.toLocaleString()}
                         </span>
-                        <span className="font-medium text-foreground">Rs. {item.totalAmount.toLocaleString()}</span>
+                        <span className="font-medium text-foreground">Rs. {item.subtotal.toLocaleString()}</span>
                       </div>
                       <p className="text-muted-foreground">
-                        {item.quantityInDozen * 12} pieces @ Rs. {item.pricePerPiece}/piece
+                        {item.quantity * 12} pieces @ Rs. {item.unitPrice / 12}/piece
                       </p>
                     </div>
                   </div>

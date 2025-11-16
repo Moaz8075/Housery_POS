@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { suppliers } from "@/lib/data-store"
-import type { Supplier } from "@/lib/types"
+import { createSupplier, Supplier } from "@/lib/dataProvider"
 
 interface AddSupplierDialogProps {
   open: boolean
@@ -23,20 +23,18 @@ export function AddSupplierDialog({ open, onOpenChange, onSupplierAdded }: AddSu
     shopName: "",
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const newSupplier: Supplier = {
-      id: `sup-${Date.now()}`,
+    const newSupplier = {
       name: formData.name,
       phoneNumber: formData.phoneNumber,
       shopName: formData.shopName || undefined,
       totalPurchases: 0,
       pendingPayment: 0,
-      createdAt: new Date(),
     }
 
-    suppliers.push(newSupplier)
+    await createSupplier(newSupplier)
 
     setFormData({ name: "", phoneNumber: "", shopName: "" })
     onOpenChange(false)

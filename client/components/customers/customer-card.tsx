@@ -1,10 +1,10 @@
 "use client"
 
-import type { Customer } from "@/lib/types"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Phone, Store } from "lucide-react"
+import { Customer } from "@/lib/dataProvider"
 
 interface CustomerCardProps {
   customer: Customer

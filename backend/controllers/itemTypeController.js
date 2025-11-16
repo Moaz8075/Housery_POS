@@ -4,14 +4,14 @@ import asyncHandler from "../middleware/asyncHandler.js"
 // GET all itemTypes
 export const getItemTypes = asyncHandler(async (req, res) => {
   const itemTypes = await ItemType.find()
-  res.json(transactions)
+  res.json(itemTypes)
 })
 
 // POST new itemType
 export const createItemType = asyncHandler(async (req, res) => {
   const { name, description } = req.body
   const itemType = await ItemType.create({ name, description })
-  res.status(201).json(itemTypes)
+  res.status(201).json(itemType)
 })
 
 // PUT update itemType

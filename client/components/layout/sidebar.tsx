@@ -3,18 +3,17 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, ShoppingCart, Package, Users, Truck, CreditCard, Bell, LogOut } from "lucide-react"
+import { LayoutDashboard, ShoppingCart, Package, Users, Truck, LogOut, History } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "New Sale", href: "/sales/new", icon: ShoppingCart },
+  { name: "Sales History", href: "/sales", icon: History },
   { name: "Stock", href: "/stock", icon: Package },
   { name: "Customers", href: "/customers", icon: Users },
   { name: "Suppliers", href: "/suppliers", icon: Truck },
-  { name: "Payments", href: "/payments", icon: CreditCard },
-  { name: "Alerts", href: "/alerts", icon: Bell },
 ]
 
 export function Sidebar() {

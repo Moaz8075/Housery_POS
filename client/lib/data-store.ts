@@ -1,10 +1,10 @@
 // Mock data store - can be replaced with API calls later
+import { StockItem } from "./dataProvider"
 import type {
   Category,
   Brand,
   ItemType,
   Size,
-  StockItem,
   Customer,
   Supplier,
   Transaction,
@@ -260,10 +260,11 @@ export function getSizeName(id: string): string {
   return sizes.find((s) => s.id === id)?.name || "Unknown"
 }
 
-export function getStockItemDisplay(item: StockItem): string {
-  const category = getCategoryName(item.categoryId)
-  const brand = getBrandName(item.brandId)
-  const type = getTypeName(item.typeId)
-  const size = getSizeName(item.sizeId)
-  return `${brand} ${type} (${size})`
+export function getStockItemDisplay(item: StockItem | string): string {
+  if(typeof(item) === 'string') return ''
+  const category = item.categoryId?.name
+  const brand = item.brandId?.name
+  const type = item.typeId?.name 
+  const size = item.sizeId?.name
+  return `${category} ${brand} ${type} (${size})`
 }

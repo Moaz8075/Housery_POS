@@ -1,49 +1,121 @@
 import express from "express"
+
+// Category
 import {
   getCategories,
   createCategory,
   updateCategory,
   deleteCategory,
 } from "../controllers/categoryController.js"
+
+// Brand
 import {
   getBrands,
   createBrand,
   updateBrand,
   deleteBrand,
 } from "../controllers/brandController.js"
+
+// Item Types
+import {
+  getItemTypes,
+  createItemType,
+  updateItemType,
+  deleteItemType,
+} from "../controllers/itemTypeController.js"
+
+// Sizes
+import {
+  getSizes,
+  createSize,
+  updateSize,
+  deleteSize,
+} from "../controllers/sizeController.js"
+
+// Stock Items
 import {
   getStockItems,
   createStockItem,
   updateStockItem,
   deleteStockItem,
 } from "../controllers/stockItemController.js"
-import { getDashboardStats } from "../controllers/dashboardController.js"
-import { createPayment, getPayments, deletePayment } from "../controllers/paymentController.js"
-import { createSale, deleteSale, getSales, updateSale } from "../controllers/saleController.js"
+
+// Customers
+import {
+  getCustomers,
+  createCustomer,
+  updateCustomer,
+  deleteCustomer,
+} from "../controllers/customerController.js"
+
+// Suppliers
+import {
+  getSuppliers,
+  createSupplier,
+  updateSupplier,
+  deleteSupplier,
+} from "../controllers/supplierController.js"
+
+// Sales
+import {
+  getSales,
+  createSale,
+  updateSale,
+  deleteSale,
+} from "../controllers/saleController.js"
+
+// Transactions
+import {
+  getTransactions,
+  getTransactionsByType,
+  createTransaction,
+  updateTransaction,
+  deleteTransaction,
+} from "../controllers/transactionController.js"
+
+// Dashboard
+import { getDashboard} from "../controllers/dashboardController.js"
 
 const router = express.Router()
 
-// Categories
+// ---------- Categories ----------
 router.route("/categories").get(getCategories).post(createCategory)
 router.route("/categories/:id").put(updateCategory).delete(deleteCategory)
 
-// Payments
-router.route("/payments").get(getPayments).post(createPayment)
-router.route("/payments/:id").delete(deletePayment)
-
-// Sales
-router.route("/sales").get(getSales).post(createSale)
-router.route("/sales/:id").put(updateSale).delete(deleteSale)
-
-// Brands
+// ---------- Brands ----------
 router.route("/brands").get(getBrands).post(createBrand)
 router.route("/brands/:id").put(updateBrand).delete(deleteBrand)
 
-// Stock Items
+// ---------- Item Types ----------
+router.route("/item-types").get(getItemTypes).post(createItemType)
+router.route("/item-types/:id").put(updateItemType).delete(deleteItemType)
+
+// ---------- Sizes ----------
+router.route("/sizes").get(getSizes).post(createSize)
+router.route("/sizes/:id").put(updateSize).delete(deleteSize)
+
+// ---------- Stock Items ----------
 router.route("/stock-items").get(getStockItems).post(createStockItem)
 router.route("/stock-items/:id").put(updateStockItem).delete(deleteStockItem)
 
-// --- Dashboard Stats ---
-router.get("/dashboard", getDashboardStats)
+// ---------- Customers ----------
+router.route("/customers").get(getCustomers).post(createCustomer)
+router.route("/customers/:id").put(updateCustomer).delete(deleteCustomer)
+
+// ---------- Suppliers ----------
+router.route("/suppliers").get(getSuppliers).post(createSupplier)
+router.route("/suppliers/:id").put(updateSupplier).delete(deleteSupplier)
+
+// ---------- Sales ----------
+router.route("/sales").get(getSales).post(createSale)
+router.route("/sales/:id").put(updateSale).delete(deleteSale)
+
+// ---------- Transactions ----------
+router.route("/transactions").get(getTransactions).post(createTransaction)
+router.route("/transactions/:id").put(updateTransaction).delete(deleteTransaction)
+router.get("/transactionsByType", getTransactionsByType)
+
+// ---------- Dashboard ----------
+router.get("/dashboard", getDashboard)
 
 export default router

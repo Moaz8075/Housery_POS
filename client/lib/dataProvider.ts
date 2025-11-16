@@ -7,6 +7,11 @@ export interface Category {
   description?: string
 }
 
+export interface ItemType {
+  _id: string
+  name: string
+}
+
 export interface Brand {
   _id: string
   name: string
@@ -15,10 +20,10 @@ export interface Brand {
 
 export interface StockItem {
   _id: string
-  categoryId: string
-  brandId: string
-  typeId?: string
-  sizeId?: string
+  categoryId: Category
+  brandId: Brand
+  typeId?: ItemType
+  sizeId?: Size
   quantityInDozen: number
   pricePerDozen: number
   pricePerPiece: number
@@ -32,9 +37,10 @@ export interface Customer {
   name: string
   phoneNumber: string
   shopName?: string
-  totalPurchases?: number
-  pendingPayment?: number
-  createdAt: string
+  totalPurchases: number
+  pendingPayment: number
+  createdAt: Date
+  picture?: string
 }
 
 export interface Supplier {
@@ -42,13 +48,14 @@ export interface Supplier {
   name: string
   phoneNumber: string
   shopName?: string
-  totalPurchases?: number
-  pendingPayment?: number
-  createdAt: string
+  totalPurchases: number
+  paidPayment: number
+  createdAt?: string
+  picture?: string
 }
 
 export interface SaleItem {
-  item: string // StockItem reference
+  item: string | StockItem // StockItem reference
   sku?: string
   name?: string
   unitPrice: number
@@ -60,6 +67,7 @@ export interface SaleItem {
 export interface Sale {
   _id: string
   invoiceNo: string
+  customer?: string | Customer
   items: SaleItem[]
   total: number
   tax: number
@@ -67,18 +75,20 @@ export interface Sale {
   paidAmount: number
   paymentMethod: "cash" | "card" | "mobile" | "credit"
   status: "draft" | "completed" | "cancelled"
-  createdAt: string
+  createdAt?: string
   createdBy?: string
 }
 
 export interface Payment {
   _id: string
-  sale?: string
+  sale?: string // optional because a payment might not be tied to a specific sale
   amount: number
+  type: "receiving" | "paying"
   method: "cash" | "card" | "mobile" | "bank" | "credit"
-  reference?: string
-  receivedBy?: string
+  from?: string // references Customer _id
+  to?: string   // references Supplier _id
   createdAt: string
+  updatedAt: string
 }
 
 export interface DashboardStats {
@@ -91,14 +101,41 @@ export interface DashboardStats {
   pendingPayables: number
 }
 
+export interface Size {
+  _id: string
+  name: string
+  description?: string
+}
+
+export interface ItemType {
+  _id: string
+  name: string
+  brandId?: string
+}
+
+export interface Transaction {
+  _id: string
+  type: "sale" | "purchase" | "paymentReceive" | "paymentPaid"
+  customerId?: string | Customer
+  supplierId?: string | Supplier
+  amount: number
+  amountPaid?: number
+  amountPending?: number
+  sale?: Sale
+  dueDate?: string
+  createdAt?: string
+  updatedAt?: string
+  note?: string
+}
+
 // ---------- HELPERS ----------
 const get = async <T>(url: string): Promise<T> => fetchAPI<T>(`${url}`)
 const post = async <T>(url: string, body: any): Promise<T> =>
-  fetchAPI<T>(`/api${url}`, { method: "POST", body })
+  fetchAPI<T>(`${url}`, { method: "POST", body })
 const put = async <T>(url: string, body: any): Promise<T> =>
-  fetchAPI<T>(`/api${url}`, { method: "PUT", body })
+  fetchAPI<T>(`${url}`, { method: "PUT", body })
 const del = async <T>(url: string): Promise<T> =>
-  fetchAPI<T>(`/api${url}`, { method: "DELETE" })
+  fetchAPI<T>(`${url}`, { method: "DELETE" })
 
 // ---------- CATEGORIES ----------
 export const getCategories = () => get<Category[]>("/categories")
@@ -128,7 +165,10 @@ export const updateCustomer = (id: string, data: Partial<Customer>) =>
 export const deleteCustomer = (id: string) => del(`/customers/${id}`)
 
 // ---------- SUPPLIERS ----------
-export const getSuppliers = () => get<Supplier[]>("/suppliers")
+export const getSuppliers = () => get<{
+  suppliers: Supplier[]
+  total: number
+}>("/suppliers")
 export const createSupplier = (data: Partial<Supplier>) => post<Supplier>("/suppliers", data)
 export const updateSupplier = (id: string, data: Partial<Supplier>) =>
   put<Supplier>(`/suppliers/${id}`, data)
@@ -149,7 +189,40 @@ export const updatePayment = (id: string, data: Partial<Payment>) =>
   put<Payment>(`/payments/${id}`, data)
 export const deletePayment = (id: string) => del(`/payments/${id}`)
 
+// ---------- ITEM TYPES ----------
+export const getItemTypes = () => get<ItemType[]>("/item-types")
+export const createItemType = (data: Partial<ItemType>) => post<ItemType>("/item-types", data)
+export const updateItemType = (id: string, data: Partial<ItemType>) =>
+  put<ItemType>(`/item-types/${id}`, data)
+export const deleteItemType = (id: string) => del(`/item-types/${id}`)
+
+// ---------- SIZES ----------
+export const getSizes = () => get<Size[]>("/sizes")
+export const createSize = (data: Partial<Size>) => post<Size>("/sizes", data)
+export const updateSize = (id: string, data: Partial<Size>) => put<Size>(`/sizes/${id}`, data)
+export const deleteSize = (id: string) => del(`/sizes/${id}`)
+
+
+// ---------- TRANSACTIONS ----------
+export const getTransactions = () => get<Transaction[]>("/transactions")
+export const getTransactionsByType = (id: string, type: string) =>
+  get<Transaction[]>(`/transactionsByType?id=${id}&type=${type}`)
+export const createTransaction = (data: Partial<Transaction>) =>
+  post<Transaction>("/transactions", data)
+export const updateTransaction = (id: string, data: Partial<Transaction>) =>
+  put<Transaction>(`/transactions/${id}`, data)
+export const deleteTransaction = (id: string) => del(`/transactions/${id}`)
+
 // ---------- DASHBOARD ----------
 export const getDashboardStats = async (): Promise<DashboardStats> => {
   return await get<DashboardStats>("/dashboard")
+}
+
+export function getStockItemDisplay(item: StockItem | string): string {
+  if(typeof(item) === 'string') return ''
+  const category = item.categoryId?.name
+  const brand = item.brandId?.name
+  const type = item.typeId?.name 
+  const size = item.sizeId?.name
+  return `${category} ${brand} ${type} (${size})`
 }

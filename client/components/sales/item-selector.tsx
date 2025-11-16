@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import type { StockItem } from "@/lib/types"
 import { getStockItemDisplay } from "@/lib/data-store"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Package } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { StockItem } from "@/lib/dataProvider"
 
 interface ItemSelectorProps {
   items: StockItem[]
@@ -34,11 +34,11 @@ export function ItemSelector({ items, onAddToCart }: ItemSelectorProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto">
           {items.map((item) => {
             const isLowStock = item.quantityInDozen <= item.lowStockThreshold
-            const isSelected = selectedItem?.id === item.id
+            const isSelected = selectedItem?._id === item._id
 
             return (
               <Card
-                key={item.id}
+                key={item._id}
                 className={cn(
                   "cursor-pointer transition-all hover:border-primary",
                   isSelected && "border-primary bg-primary/5",

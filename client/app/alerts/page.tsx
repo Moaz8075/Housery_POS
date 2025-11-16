@@ -114,7 +114,8 @@ export default function AlertsPage() {
         ) : (
           <div className="space-y-3">
             {filteredAlerts.map((alert) => (
-              <AlertItem key={alert.id} alert={alert} />
+              // <AlertItem key={alert.id} alert={alert} />
+              <div>Hello</div>
             ))}
           </div>
         )}

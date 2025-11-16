@@ -1,35 +1,82 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ItemSelector } from "@/components/sales/item-selector"
 import { Cart } from "@/components/sales/cart"
 import { CheckoutForm, type CheckoutData } from "@/components/sales/checkout-form"
-import { stockItems } from "@/lib/data-store"
-import type { StockItem, SaleItem } from "@/lib/types"
+import { getStockItems, createSale, StockItem, SaleItem } from "@/lib/dataProvider"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { getDisplayName } from "next/dist/shared/lib/utils"
+import { getStockItemDisplay } from "@/lib/data-store"
 
 export default function NewSalePage() {
   const router = useRouter()
+  const [stockItems, setStockItems] = useState<StockItem[]>([])
   const [cartItems, setCartItems] = useState<(SaleItem & { id: string })[]>([])
   const [showCheckout, setShowCheckout] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  const fetchItems = async () => {
+    try {
+      const items = await getStockItems()
+      setStockItems(items)
+    } catch (err) {
+      console.error("Failed to fetch stock items:", err)
+    } finally {
+      setLoading(false)
+    }
+  }
+  // Fetch real stock items from backend
+  useEffect(() => {
+    fetchItems()
+  }, [])
 
   const handleAddToCart = (item: StockItem, quantity: number) => {
+  const itemId = item._id;
+
+  // Find if item already exists in cart
+  const existing = cartItems.find(
+    (c) => getItemId(c.item) === itemId
+  );
+
+  if (existing) {
+    // Update existing item
+    setCartItems(
+      cartItems.map((c) => {
+        if (getItemId(c.item) === itemId) {
+          const newQuantity = c.quantity + quantity;
+          return {
+            ...c,
+            quantity: newQuantity,
+            subtotal: newQuantity * c.unitPrice,
+          };
+        }
+        return c;
+      })
+    );
+  } else {
+    // Add new item
     const cartItem: SaleItem & { id: string } = {
       id: `cart-${Date.now()}`,
-      stockItemId: item.id,
-      quantityInDozen: quantity,
-      pricePerDozen: item.pricePerDozen,
-      pricePerPiece: item.pricePerPiece,
-      totalAmount: quantity * item.pricePerDozen,
-    }
-
-    setCartItems([...cartItems, cartItem])
+      item: item,
+      name: getStockItemDisplay(item),
+      unitPrice: item.pricePerDozen,
+      quantity: quantity,
+      subtotal: quantity * item.pricePerDozen,
+    };
+    setCartItems([...cartItems, cartItem]);
   }
+};
+
+function getItemId(i: string | StockItem) {
+  return typeof i === "string" ? i : i._id;
+}
+
 
   const handleRemoveItem = (id: string) => {
     setCartItems(cartItems.filter((item) => item.id !== id))
@@ -41,26 +88,43 @@ export default function NewSalePage() {
     }
   }
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.totalAmount, 0)
+  const subtotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0)
 
-  const handleCheckout = (data: CheckoutData) => {
-    console.log("[v0] Sale completed:", {
-      items: cartItems,
-      ...data,
-      total: subtotal,
-      pending: subtotal - data.amountPaid,
-    })
+  const handleCheckout = async (data: CheckoutData) => {
+    try {
+      
+      const saleData = {
+        items: cartItems.map((c) => ({
+          item: c.item,
+          quantity: c.quantity,
+          unitPrice: c.unitPrice,
+          subtotal: c.subtotal,
+        })),
+        total: subtotal,
+        paidAmount: data.amountPaid,
+        discount: data.discount || 0,
+        tax: data.tax || 0,
+        paymentMethod: data.paymentMethod,
+        status: "completed" as "completed",
+        customer: data.customerId
+      }
 
-    // Show success message
-    setShowSuccess(true)
-    setShowCheckout(false)
-
-    // Reset after 2 seconds
-    setTimeout(() => {
-      setShowSuccess(false)
+      await createSale(saleData)
+      setShowSuccess(true)
+      setShowCheckout(false)
       setCartItems([])
-    }, 2000)
+
+      setTimeout(() => {
+        setShowSuccess(false)
+      }, 10000)
+      fetchItems();
+    } catch (err) {
+      console.error("Failed to complete sale:", err)
+      alert("Failed to complete sale. Please try again.")
+    }
   }
+
+  if (loading) return <p className="p-4">Loading stock items...</p>
 
   const availableItems = stockItems.filter((item) => item.quantityInDozen > 0)
 
@@ -81,15 +145,11 @@ export default function NewSalePage() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* Item Selection - 2 columns on large screens */}
         <div className="lg:col-span-2">
           <ItemSelector items={availableItems} onAddToCart={handleAddToCart} />
         </div>
-
-        {/* Cart - Full width on mobile, 1 column on large */}
         <div className="space-y-4">
           <Cart items={cartItems} onRemoveItem={handleRemoveItem} onClearCart={handleClearCart} />
-
           {cartItems.length > 0 && (
             <Button onClick={() => setShowCheckout(true)} className="w-full" size="lg">
               Proceed to Checkout
@@ -98,21 +158,16 @@ export default function NewSalePage() {
         </div>
       </div>
 
-      {/* Checkout Dialog */}
       <Dialog open={showCheckout} onOpenChange={setShowCheckout}>
         <DialogContent className="w-[calc(100%-2rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <CheckoutForm subtotal={subtotal} onComplete={handleCheckout} />
         </DialogContent>
       </Dialog>
 
-      {/* Success Dialog */}
       <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="text-center text-2xl">Sale Completed!</DialogTitle>
-            <DialogDescription className="text-center text-lg pt-4">
-              Transaction successful. Receipt generated.
-            </DialogDescription>
           </DialogHeader>
           <div className="text-center py-4">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -120,7 +175,6 @@ export default function NewSalePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-3xl font-bold">Rs. {subtotal.toLocaleString()}</p>
           </div>
         </DialogContent>
       </Dialog>

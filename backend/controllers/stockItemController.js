@@ -1,27 +1,41 @@
-import StockItem from "../models/StockItem.js"
-import asyncHandler from "../middleware/asyncHandler.js"
+import StockItem from "../models/StockItem.js";
+import asyncHandler from "../middleware/asyncHandler.js";
 
-// GET all stockItems
 export const getStockItems = asyncHandler(async (req, res) => {
-  const stockItems = await StockItem.find()
-  res.json(stockItems)
-})
+  const items = await StockItem.find()
+    .populate("categoryId", "name")
+    .populate("brandId", "name")
+    .populate("typeId", "name")
+    .populate("sizeId", "name")
+    .sort({ createdAt: -1 });
 
-// POST new stockItem
+  res.json(items);
+});
+
 export const createStockItem = asyncHandler(async (req, res) => {
-  const { name, description } = req.body
-  const stockItem = await StockItem.create({ name, description })
-  res.status(201).json(stockItem)
-})
+  const payload = req.body;
+  const item = await StockItem.create(payload);
+  const populated = await item.populate([
+    { path: "categoryId", select: "name" },
+    { path: "brandId", select: "name" },
+    { path: "typeId", select: "name" },
+    { path: "sizeId", select: "name" }
+  ]);
+  res.status(201).json(populated);
+});
 
-// PUT update stockItem
 export const updateStockItem = asyncHandler(async (req, res) => {
-  const stockItem = await StockItem.findByIdAndUpdate(req.params.id, req.body, { new: true })
-  res.json(stockItem)
-})
+  const updated = await StockItem.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  const populated = await updated.populate([
+    { path: "categoryId", select: "name" },
+    { path: "brandId", select: "name" },
+    { path: "typeId", select: "name" },
+    { path: "sizeId", select: "name" }
+  ]);
+  res.json(populated);
+});
 
-// DELETE stockItem
 export const deleteStockItem = asyncHandler(async (req, res) => {
-  await StockItem.findByIdAndDelete(req.params.id)
-  res.json({ message: "StockItem deleted" })
-})
+  await StockItem.findByIdAndDelete(req.params.id);
+  res.status(204).end();
+});

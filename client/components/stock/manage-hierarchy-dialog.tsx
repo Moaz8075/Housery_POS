@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -17,9 +15,24 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { categories, brands, itemTypes, sizes } from "@/lib/data-store"
 import { Settings, Plus, Trash2 } from "lucide-react"
-import type { Category, Brand, ItemType, Size } from "@/lib/types"
+
+import {
+  getCategories,
+  createCategory,
+  deleteCategory,
+  getBrands,
+  createBrand,
+  deleteBrand,
+  getItemTypes,
+  createItemType,
+  deleteItemType,
+  getSizes,
+  createSize,
+  deleteSize,
+} from "@/lib/dataProvider"
+
+import type { Category, Brand, ItemType, Size } from "@/lib/dataProvider"
 
 interface ManageHierarchyDialogProps {
   onUpdate?: () => void
@@ -29,111 +42,114 @@ export function ManageHierarchyDialog({ onUpdate }: ManageHierarchyDialogProps) 
   const [open, setOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("categories")
 
-  // Category states
+  // Data lists
+  const [categories, setCategories] = useState<Category[]>([])
+  const [brands, setBrands] = useState<Brand[]>([])
+  const [itemTypes, setItemTypes] = useState<ItemType[]>([])
+  const [sizes, setSizes] = useState<Size[]>([])
+
+  // Form states
   const [newCategoryName, setNewCategoryName] = useState("")
   const [newCategoryDesc, setNewCategoryDesc] = useState("")
-
-  // Brand states
   const [newBrandName, setNewBrandName] = useState("")
   const [newBrandCategory, setNewBrandCategory] = useState("")
-
-  // Type states
   const [newTypeName, setNewTypeName] = useState("")
   const [newTypeBrand, setNewTypeBrand] = useState("")
-
-  // Size states
   const [newSizeName, setNewSizeName] = useState("")
 
-  const handleAddCategory = (e: React.FormEvent) => {
-    e.preventDefault()
-    const newCategory: Category = {
-      id: `cat-${Date.now()}`,
-      name: newCategoryName,
-      description: newCategoryDesc,
+  const [loading, setLoading] = useState(false)
+
+  // ---------- Fetch all data ----------
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [catRes, brandRes, typeRes, sizeRes] = await Promise.all([
+        getCategories(),
+        getBrands(),
+        getItemTypes(),
+        getSizes(),
+      ])
+      setCategories(catRes)
+      setBrands(brandRes)
+      setItemTypes(typeRes)
+      setSizes(sizeRes)
+    } catch (error) {
+      console.error("Failed to load data:", error)
+    } finally {
+      setLoading(false)
     }
-    categories.push(newCategory)
+  }
+
+  useEffect(() => {
+    if (open) loadData()
+  }, [open])
+
+  // ---------- Add / Delete Handlers ----------
+
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await createCategory({ name: newCategoryName, description: newCategoryDesc })
     setNewCategoryName("")
     setNewCategoryDesc("")
+    loadData()
     onUpdate?.()
   }
 
-  const handleAddBrand = (e: React.FormEvent) => {
-    e.preventDefault()
-    const newBrand: Brand = {
-      id: `brand-${Date.now()}`,
-      name: newBrandName,
-      categoryId: newBrandCategory,
+  const handleDeleteCategory = async (id: string) => {
+    if (confirm("Are you sure you want to delete this category?")) {
+      await deleteCategory(id)
+      loadData()
     }
-    brands.push(newBrand)
+  }
+
+  const handleAddBrand = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await createBrand({ name: newBrandName, categoryId: newBrandCategory })
     setNewBrandName("")
     setNewBrandCategory("")
+    loadData()
     onUpdate?.()
   }
 
-  const handleAddType = (e: React.FormEvent) => {
-    e.preventDefault()
-    const newType: ItemType = {
-      id: `type-${Date.now()}`,
-      name: newTypeName,
-      brandId: newTypeBrand,
+  const handleDeleteBrand = async (id: string) => {
+    if (confirm("Are you sure you want to delete this brand?")) {
+      await deleteBrand(id)
+      loadData()
     }
-    itemTypes.push(newType)
+  }
+
+  const handleAddType = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await createItemType({ name: newTypeName, brandId: newTypeBrand })
     setNewTypeName("")
     setNewTypeBrand("")
+    loadData()
     onUpdate?.()
   }
 
-  const handleAddSize = (e: React.FormEvent) => {
+  const handleDeleteType = async (id: string) => {
+    if (confirm("Are you sure you want to delete this type?")) {
+      await deleteItemType(id)
+      loadData()
+    }
+  }
+
+  const handleAddSize = async (e: React.FormEvent) => {
     e.preventDefault()
-    const newSize: Size = {
-      id: `size-${Date.now()}`,
-      name: newSizeName,
-    }
-    sizes.push(newSize)
+    await createSize({ name: newSizeName })
     setNewSizeName("")
+    loadData()
     onUpdate?.()
   }
 
-  const handleDeleteCategory = (id: string) => {
-    if (confirm("Are you sure? This will affect related brands and items.")) {
-      const index = categories.findIndex((c) => c.id === id)
-      if (index > -1) {
-        categories.splice(index, 1)
-        onUpdate?.()
-      }
+  const handleDeleteSize = async (id: string) => {
+    if (confirm("Are you sure you want to delete this size?")) {
+      await deleteSize(id)
+      loadData()
     }
   }
 
-  const handleDeleteBrand = (id: string) => {
-    if (confirm("Are you sure? This will affect related types and items.")) {
-      const index = brands.findIndex((b) => b.id === id)
-      if (index > -1) {
-        brands.splice(index, 1)
-        onUpdate?.()
-      }
-    }
-  }
-
-  const handleDeleteType = (id: string) => {
-    if (confirm("Are you sure? This will affect related items.")) {
-      const index = itemTypes.findIndex((t) => t.id === id)
-      if (index > -1) {
-        itemTypes.splice(index, 1)
-        onUpdate?.()
-      }
-    }
-  }
-
-  const handleDeleteSize = (id: string) => {
-    if (confirm("Are you sure? This will affect related items.")) {
-      const index = sizes.findIndex((s) => s.id === id)
-      if (index > -1) {
-        sizes.splice(index, 1)
-        onUpdate?.()
-      }
-    }
-  }
-
+  // ---------- UI ----------
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -145,217 +161,198 @@ export function ManageHierarchyDialog({ onUpdate }: ManageHierarchyDialogProps) 
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Manage Stock Hierarchy</DialogTitle>
-          <DialogDescription>Add or remove categories, brands, types, and sizes for your inventory.</DialogDescription>
+          <DialogDescription>
+            Add or remove categories, brands, types, and sizes for your inventory.
+          </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="categories">Categories</TabsTrigger>
-            <TabsTrigger value="brands">Brands</TabsTrigger>
-            <TabsTrigger value="types">Types</TabsTrigger>
-            <TabsTrigger value="sizes">Sizes</TabsTrigger>
-          </TabsList>
+        {loading ? (
+          <div className="text-center py-10 text-muted-foreground">Loading data...</div>
+        ) : (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="categories">Categories</TabsTrigger>
+              <TabsTrigger value="brands">Brands</TabsTrigger>
+              <TabsTrigger value="types">Types</TabsTrigger>
+              <TabsTrigger value="sizes">Sizes</TabsTrigger>
+            </TabsList>
 
-          {/* Categories Tab */}
-          <TabsContent value="categories" className="space-y-4">
-            <form onSubmit={handleAddCategory} className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="cat-name">Category Name</Label>
+            {/* --- Categories --- */}
+            <TabsContent value="categories" className="space-y-4">
+              <form onSubmit={handleAddCategory} className="space-y-3">
+                <Label>Category Name</Label>
                 <Input
-                  id="cat-name"
-                  placeholder="e.g., Vest"
+                  placeholder="e.g. Vest"
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
                   required
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cat-desc">Description (Optional)</Label>
+                <Label>Description</Label>
                 <Input
-                  id="cat-desc"
-                  placeholder="e.g., All types of vests"
+                  placeholder="e.g. All types of vests"
                   value={newCategoryDesc}
                   onChange={(e) => setNewCategoryDesc(e.target.value)}
                 />
-              </div>
-              <Button type="submit" size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Category
-              </Button>
-            </form>
+                <Button type="submit" size="sm">
+                  <Plus className="mr-2 h-4 w-4" /> Add Category
+                </Button>
+              </form>
 
-            <div className="border rounded-lg divide-y">
-              {categories.map((cat) => (
-                <div key={cat.id} className="p-3 flex items-center justify-between hover:bg-muted/50">
-                  <div>
-                    <p className="font-medium">{cat.name}</p>
-                    {cat.description && <p className="text-sm text-muted-foreground">{cat.description}</p>}
+              <div className="border rounded-lg divide-y">
+                {categories.map((cat) => (
+                  <div key={cat._id} className="p-3 flex items-center justify-between hover:bg-muted/50">
+                    <div>
+                      <p className="font-medium">{cat.name}</p>
+                      {cat.description && (
+                        <p className="text-sm text-muted-foreground">{cat.description}</p>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteCategory(cat._id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteCategory(cat.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
+                ))}
+              </div>
+            </TabsContent>
 
-          {/* Brands Tab */}
-          <TabsContent value="brands" className="space-y-4">
-            <form onSubmit={handleAddBrand} className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="brand-name">Brand Name</Label>
+            {/* --- Brands --- */}
+            <TabsContent value="brands" className="space-y-4">
+              <form onSubmit={handleAddBrand} className="space-y-3">
+                <Label>Brand Name</Label>
                 <Input
-                  id="brand-name"
-                  placeholder="e.g., Gull"
+                  placeholder="e.g. Gull"
                   value={newBrandName}
                   onChange={(e) => setNewBrandName(e.target.value)}
                   required
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="brand-cat">Category</Label>
+                <Label>Category</Label>
                 <Select value={newBrandCategory} onValueChange={setNewBrandCategory} required>
-                  <SelectTrigger id="brand-cat">
+                  <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
+                      <SelectItem key={cat._id} value={cat._id}>
                         {cat.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <Button type="submit" size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Brand
-              </Button>
-            </form>
+                <Button type="submit" size="sm">
+                  <Plus className="mr-2 h-4 w-4" /> Add Brand
+                </Button>
+              </form>
 
-            <div className="border rounded-lg divide-y">
-              {brands.map((brand) => {
-                const category = categories.find((c) => c.id === brand.categoryId)
-                return (
-                  <div key={brand.id} className="p-3 flex items-center justify-between hover:bg-muted/50">
+              <div className="border rounded-lg divide-y">
+                {brands.map((brand) => (
+                  <div key={brand._id} className="p-3 flex items-center justify-between hover:bg-muted/50">
                     <div>
                       <p className="font-medium">{brand.name}</p>
-                      <p className="text-sm text-muted-foreground">Category: {category?.name || "Unknown"}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Category: {categories.find((c) => c._id === brand.categoryId)?.name || "Unknown"}
+                      </p>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleDeleteBrand(brand.id)}
+                      onClick={() => handleDeleteBrand(brand._id)}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                )
-              })}
-            </div>
-          </TabsContent>
+                ))}
+              </div>
+            </TabsContent>
 
-          {/* Types Tab */}
-          <TabsContent value="types" className="space-y-4">
-            <form onSubmit={handleAddType} className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="type-name">Type Name</Label>
+            {/* --- Types --- */}
+            <TabsContent value="types" className="space-y-4">
+              <form onSubmit={handleAddType} className="space-y-3">
+                <Label>Type Name</Label>
                 <Input
-                  id="type-name"
-                  placeholder="e.g., Sando"
+                  placeholder="e.g. Sando"
                   value={newTypeName}
                   onChange={(e) => setNewTypeName(e.target.value)}
                   required
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="type-brand">Brand</Label>
+                <Label>Brand</Label>
                 <Select value={newTypeBrand} onValueChange={setNewTypeBrand} required>
-                  <SelectTrigger id="type-brand">
+                  <SelectTrigger>
                     <SelectValue placeholder="Select brand" />
                   </SelectTrigger>
                   <SelectContent>
                     {brands.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id}>
+                      <SelectItem key={brand._id} value={brand._id}>
                         {brand.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <Button type="submit" size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Type
-              </Button>
-            </form>
+                <Button type="submit" size="sm">
+                  <Plus className="mr-2 h-4 w-4" /> Add Type
+                </Button>
+              </form>
 
-            <div className="border rounded-lg divide-y">
-              {itemTypes.map((type) => {
-                const brand = brands.find((b) => b.id === type.brandId)
-                return (
-                  <div key={type.id} className="p-3 flex items-center justify-between hover:bg-muted/50">
+              <div className="border rounded-lg divide-y">
+                {itemTypes.map((type) => (
+                  <div key={type._id} className="p-3 flex items-center justify-between hover:bg-muted/50">
                     <div>
                       <p className="font-medium">{type.name}</p>
-                      <p className="text-sm text-muted-foreground">Brand: {brand?.name || "Unknown"}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Brand: {brands.find((b) => b._id === type.brandId)?.name || "Unknown"}
+                      </p>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleDeleteType(type.id)}
+                      onClick={() => handleDeleteType(type._id)}
                       className="text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                )
-              })}
-            </div>
-          </TabsContent>
+                ))}
+              </div>
+            </TabsContent>
 
-          {/* Sizes Tab */}
-          <TabsContent value="sizes" className="space-y-4">
-            <form onSubmit={handleAddSize} className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="size-name">Size Name</Label>
+            {/* --- Sizes --- */}
+            <TabsContent value="sizes" className="space-y-4">
+              <form onSubmit={handleAddSize} className="space-y-3">
+                <Label>Size Name</Label>
                 <Input
-                  id="size-name"
-                  placeholder="e.g., 18/22"
+                  placeholder="e.g. 18/22"
                   value={newSizeName}
                   onChange={(e) => setNewSizeName(e.target.value)}
                   required
                 />
-              </div>
-              <Button type="submit" size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Size
-              </Button>
-            </form>
+                <Button type="submit" size="sm">
+                  <Plus className="mr-2 h-4 w-4" /> Add Size
+                </Button>
+              </form>
 
-            <div className="border rounded-lg divide-y">
-              {sizes.map((size) => (
-                <div key={size.id} className="p-3 flex items-center justify-between hover:bg-muted/50">
-                  <div>
+              <div className="border rounded-lg divide-y">
+                {sizes.map((size) => (
+                  <div key={size._id} className="p-3 flex items-center justify-between hover:bg-muted/50">
                     <p className="font-medium">{size.name}</p>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteSize(size._id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteSize(size.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
+                ))}
+              </div>
+            </TabsContent>
+          </Tabs>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>

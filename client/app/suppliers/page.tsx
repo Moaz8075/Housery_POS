@@ -1,24 +1,42 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { SupplierCard } from "@/components/suppliers/supplier-card"
 import { SupplierDetailsDialog } from "@/components/suppliers/supplier-details-dialog"
-import { suppliers } from "@/lib/data-store"
-import type { Supplier } from "@/lib/types"
+import { AddSupplierDialog } from "@/components/suppliers/add-supplier-dialog"
+import { getSuppliers, type Supplier } from "@/lib/dataProvider"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, Truck, AlertCircle, TrendingDown, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { AddSupplierDialog } from "@/components/suppliers/add-supplier-dialog"
 
 export default function SuppliersPage() {
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [refreshKey, setRefreshKey] = useState(0)
+  const [loading, setLoading] = useState(false)
+
+  // Fetch suppliers
+  useEffect(() => {
+    const fetchSuppliers = async () => {
+      setLoading(true)
+      try {
+        const data = await getSuppliers()
+        setSuppliers(data.suppliers)
+      } catch (err) {
+        console.error("Failed to fetch suppliers:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSuppliers()
+  }, [refreshKey])
 
   const filteredSuppliers = suppliers.filter((supplier) => {
     const matchesSearch =
@@ -40,6 +58,7 @@ export default function SuppliersPage() {
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Suppliers</h1>
@@ -51,6 +70,7 @@ export default function SuppliersPage() {
         </Button>
       </div>
 
+      {/* Stats */}
       <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -86,6 +106,7 @@ export default function SuppliersPage() {
         </Card>
       </div>
 
+      {/* Filters */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="search">Search Suppliers</Label>
@@ -116,20 +137,25 @@ export default function SuppliersPage() {
         </div>
       </div>
 
+      {/* Supplier Cards */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3" key={refreshKey}>
-        {filteredSuppliers.length === 0 ? (
+        {loading ? (
+          <div className="col-span-full text-center py-12 text-muted-foreground">Loading suppliers...</div>
+        ) : filteredSuppliers.length === 0 ? (
           <div className="col-span-full text-center py-12 text-muted-foreground">No suppliers found</div>
         ) : (
           filteredSuppliers.map((supplier) => (
-            <SupplierCard key={supplier.id} supplier={supplier} onClick={() => setSelectedSupplier(supplier)} />
+            <SupplierCard key={supplier._id} supplier={supplier} onClick={() => setSelectedSupplier(supplier)} />
           ))
         )}
       </div>
 
+      {/* Dialogs */}
       <SupplierDetailsDialog
         supplier={selectedSupplier}
         open={!!selectedSupplier}
         onOpenChange={(open) => !open && setSelectedSupplier(null)}
+         onSupplierUpdate={() => setRefreshKey((k) => k + 1)}
       />
 
       <AddSupplierDialog

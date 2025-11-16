@@ -1,368 +1,136 @@
 "use client"
 
-import type React from "react"
+import { useEffect, useState } from "react"
+import { StockTable } from "@/components/stock/stock-table"
+import { AddStockDialog } from "@/components/stock/add-stock-dialog"
+import { ManageHierarchyDialog } from "@/components/stock/manage-hierarchy-dialog"
+import { StockFilters } from "@/components/stock/stock-filters"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Package, AlertTriangle, TrendingUp } from "lucide-react"
+import { createStockItem, deleteStockItem, getStockItemDisplay, getStockItems, StockItem } from "@/lib/dataProvider"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { categories, brands, itemTypes, sizes } from "@/lib/data-store"
-import { Settings, Plus, Trash2 } from "lucide-react"
-import type { Category, Brand, ItemType, Size } from "@/lib/types"
+export default function StockPage() {
+  const [searchTerm, setSearchTerm] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState("all")
+  const [brandFilter, setBrandFilter] = useState("all")
+  const [stockFilter, setStockFilter] = useState("all")
 
-interface ManageHierarchyDialogProps {
-  onUpdate?: () => void
-}
+  const [stockItems, setStockItems] = useState<StockItem[]>([])
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [loading, setLoading] = useState(true)
 
-export function ManageHierarchyDialog({ onUpdate }: ManageHierarchyDialogProps) {
-  const [open, setOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState("categories")
-
-  // Category states
-  const [newCategoryName, setNewCategoryName] = useState("")
-  const [newCategoryDesc, setNewCategoryDesc] = useState("")
-
-  // Brand states
-  const [newBrandName, setNewBrandName] = useState("")
-  const [newBrandCategory, setNewBrandCategory] = useState("")
-
-  // Type states
-  const [newTypeName, setNewTypeName] = useState("")
-  const [newTypeBrand, setNewTypeBrand] = useState("")
-
-  // Size states
-  const [newSizeName, setNewSizeName] = useState("")
-
-  const handleAddCategory = (e: React.FormEvent) => {
-    e.preventDefault()
-    const newCategory: Category = {
-      id: `cat-${Date.now()}`,
-      name: newCategoryName,
-      description: newCategoryDesc,
-    }
-    categories.push(newCategory)
-    setNewCategoryName("")
-    setNewCategoryDesc("")
-    onUpdate?.()
-  }
-
-  const handleAddBrand = (e: React.FormEvent) => {
-    e.preventDefault()
-    const newBrand: Brand = {
-      id: `brand-${Date.now()}`,
-      name: newBrandName,
-      categoryId: newBrandCategory,
-    }
-    brands.push(newBrand)
-    setNewBrandName("")
-    setNewBrandCategory("")
-    onUpdate?.()
-  }
-
-  const handleAddType = (e: React.FormEvent) => {
-    e.preventDefault()
-    const newType: ItemType = {
-      id: `type-${Date.now()}`,
-      name: newTypeName,
-      brandId: newTypeBrand,
-    }
-    itemTypes.push(newType)
-    setNewTypeName("")
-    setNewTypeBrand("")
-    onUpdate?.()
-  }
-
-  const handleAddSize = (e: React.FormEvent) => {
-    e.preventDefault()
-    const newSize: Size = {
-      id: `size-${Date.now()}`,
-      name: newSizeName,
-    }
-    sizes.push(newSize)
-    setNewSizeName("")
-    onUpdate?.()
-  }
-
-  const handleDeleteCategory = (id: string) => {
-    if (confirm("Are you sure? This will affect related brands and items.")) {
-      const index = categories.findIndex((c) => c.id === id)
-      if (index > -1) {
-        categories.splice(index, 1)
-        onUpdate?.()
+  useEffect(() => {
+    async function fetchItems() {
+      try {
+        setLoading(true)
+        const data = await getStockItems()
+        setStockItems(data)
+      } catch (error) {
+        console.error("Failed to fetch stock items:", error)
+      } finally {
+        setLoading(false)
       }
     }
+
+    fetchItems()
+  }, [refreshKey]) 
+
+  const handleAddStock = async (newItem: StockItem) => {
+    await createStockItem(newItem);
+    setRefreshKey((prev) => prev + 1)
   }
 
-  const handleDeleteBrand = (id: string) => {
-    if (confirm("Are you sure? This will affect related types and items.")) {
-      const index = brands.findIndex((b) => b.id === id)
-      if (index > -1) {
-        brands.splice(index, 1)
-        onUpdate?.()
-      }
+  const handleHierarchyUpdate = () => {
+    setRefreshKey((prev) => prev + 1)
+  }
+
+  const handleDeleteStock = async (item: StockItem) => {
+    if (confirm(`Are you sure you want to delete ${getStockItemDisplay(item)}?`)) {
+      await deleteStockItem(item._id)
+       setRefreshKey((prev) => prev + 1)
     }
   }
 
-  const handleDeleteType = (id: string) => {
-    if (confirm("Are you sure? This will affect related items.")) {
-      const index = itemTypes.findIndex((t) => t.id === id)
-      if (index > -1) {
-        itemTypes.splice(index, 1)
-        onUpdate?.()
-      }
-    }
-  }
+  // Filter items
+  const filteredItems = stockItems.filter((item) => {
+    const matchesSearch = getStockItemDisplay(item).toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCategory = categoryFilter === "all" || item.categoryId?.name === categoryFilter
+    const matchesBrand = brandFilter === "all" || item.brandId?.name === brandFilter
+    const matchesStock =
+      stockFilter === "all" ||
+      (stockFilter === "low" && item.quantityInDozen <= item.lowStockThreshold) ||
+      (stockFilter === "in-stock" && item.quantityInDozen > item.lowStockThreshold)
 
-  const handleDeleteSize = (id: string) => {
-    if (confirm("Are you sure? This will affect related items.")) {
-      const index = sizes.findIndex((s) => s.id === id)
-      if (index > -1) {
-        sizes.splice(index, 1)
-        onUpdate?.()
-      }
-    }
-  }
+    return matchesSearch && matchesCategory && matchesBrand && matchesStock
+  })
+
+  const totalItems = stockItems.length
+  const lowStockItems = stockItems.filter((item) => item.quantityInDozen <= item.lowStockThreshold).length
+  const totalValue = stockItems.reduce((sum, item) => sum + item.quantityInDozen * item.pricePerDozen, 0)
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline">
-          <Settings className="mr-2 h-4 w-4" />
-          Manage Hierarchy
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Manage Stock Hierarchy</DialogTitle>
-          <DialogDescription>Add or remove categories, brands, types, and sizes for your inventory.</DialogDescription>
-        </DialogHeader>
+    <div className="container mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Stock Management</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage your inventory and track stock levels</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <ManageHierarchyDialog onUpdate={handleHierarchyUpdate} />
+          <AddStockDialog onAdd={handleAddStock} />
+        </div>
+      </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="categories">Categories</TabsTrigger>
-            <TabsTrigger value="brands">Brands</TabsTrigger>
-            <TabsTrigger value="types">Types</TabsTrigger>
-            <TabsTrigger value="sizes">Sizes</TabsTrigger>
-          </TabsList>
+      {/* Stats Cards */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+            <Package className="h-5 w-5 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalItems}</div>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">Stock items in inventory</p>
+          </CardContent>
+        </Card>
 
-          {/* Categories Tab */}
-          <TabsContent value="categories" className="space-y-4">
-            <form onSubmit={handleAddCategory} className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="cat-name">Category Name</Label>
-                <Input
-                  id="cat-name"
-                  placeholder="e.g., Vest"
-                  value={newCategoryName}
-                  onChange={(e) => setNewCategoryName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cat-desc">Description (Optional)</Label>
-                <Input
-                  id="cat-desc"
-                  placeholder="e.g., All types of vests"
-                  value={newCategoryDesc}
-                  onChange={(e) => setNewCategoryDesc(e.target.value)}
-                />
-              </div>
-              <Button type="submit" size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Category
-              </Button>
-            </form>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Low Stock Alerts</CardTitle>
+            <AlertTriangle className="h-5 w-5 text-yellow-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{lowStockItems}</div>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">Items need restocking</p>
+          </CardContent>
+        </Card>
 
-            <div className="border rounded-lg divide-y">
-              {categories.map((cat) => (
-                <div key={cat.id} className="p-3 flex items-center justify-between hover:bg-muted/50">
-                  <div>
-                    <p className="font-medium">{cat.name}</p>
-                    {cat.description && <p className="text-sm text-muted-foreground">{cat.description}</p>}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteCategory(cat.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Stock Value</CardTitle>
+            <TrendingUp className="h-5 w-5 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">Rs. {totalValue.toLocaleString()}</div>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">Current inventory value</p>
+          </CardContent>
+        </Card>
+      </div>
 
-          {/* Brands Tab */}
-          <TabsContent value="brands" className="space-y-4">
-            <form onSubmit={handleAddBrand} className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="brand-name">Brand Name</Label>
-                <Input
-                  id="brand-name"
-                  placeholder="e.g., Gull"
-                  value={newBrandName}
-                  onChange={(e) => setNewBrandName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="brand-cat">Category</Label>
-                <Select value={newBrandCategory} onValueChange={setNewBrandCategory} required>
-                  <SelectTrigger id="brand-cat">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button type="submit" size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Brand
-              </Button>
-            </form>
+      {/* Filters */}
+      <StockFilters
+        searchTerm={searchTerm}
+        categoryFilter={categoryFilter}
+        brandFilter={brandFilter}
+        stockFilter={stockFilter}
+        onSearchChange={setSearchTerm}
+        onCategoryChange={setCategoryFilter}
+        onBrandChange={setBrandFilter}
+        onStockFilterChange={setStockFilter}
+      />
 
-            <div className="border rounded-lg divide-y">
-              {brands.map((brand) => {
-                const category = categories.find((c) => c.id === brand.categoryId)
-                return (
-                  <div key={brand.id} className="p-3 flex items-center justify-between hover:bg-muted/50">
-                    <div>
-                      <p className="font-medium">{brand.name}</p>
-                      <p className="text-sm text-muted-foreground">Category: {category?.name || "Unknown"}</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteBrand(brand.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )
-              })}
-            </div>
-          </TabsContent>
-
-          {/* Types Tab */}
-          <TabsContent value="types" className="space-y-4">
-            <form onSubmit={handleAddType} className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="type-name">Type Name</Label>
-                <Input
-                  id="type-name"
-                  placeholder="e.g., Sando"
-                  value={newTypeName}
-                  onChange={(e) => setNewTypeName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="type-brand">Brand</Label>
-                <Select value={newTypeBrand} onValueChange={setNewTypeBrand} required>
-                  <SelectTrigger id="type-brand">
-                    <SelectValue placeholder="Select brand" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {brands.map((brand) => (
-                      <SelectItem key={brand.id} value={brand.id}>
-                        {brand.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button type="submit" size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Type
-              </Button>
-            </form>
-
-            <div className="border rounded-lg divide-y">
-              {itemTypes.map((type) => {
-                const brand = brands.find((b) => b.id === type.brandId)
-                return (
-                  <div key={type.id} className="p-3 flex items-center justify-between hover:bg-muted/50">
-                    <div>
-                      <p className="font-medium">{type.name}</p>
-                      <p className="text-sm text-muted-foreground">Brand: {brand?.name || "Unknown"}</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteType(type.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )
-              })}
-            </div>
-          </TabsContent>
-
-          {/* Sizes Tab */}
-          <TabsContent value="sizes" className="space-y-4">
-            <form onSubmit={handleAddSize} className="space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="size-name">Size Name</Label>
-                <Input
-                  id="size-name"
-                  placeholder="e.g., 18/22"
-                  value={newSizeName}
-                  onChange={(e) => setNewSizeName(e.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Size
-              </Button>
-            </form>
-
-            <div className="border rounded-lg divide-y">
-              {sizes.map((size) => (
-                <div key={size.id} className="p-3 flex items-center justify-between hover:bg-muted/50">
-                  <div>
-                    <p className="font-medium">{size.name}</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDeleteSize(size.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Close
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      {/* Stock Table */}
+      <StockTable items={filteredItems} onDelete={handleDeleteStock} />
+    </div>
   )
 }

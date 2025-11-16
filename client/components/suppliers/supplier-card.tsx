@@ -1,10 +1,10 @@
 "use client"
 
-import type { Supplier } from "@/lib/types"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Phone, Store } from "lucide-react"
+import { Supplier } from "@/lib/dataProvider"
 
 interface SupplierCardProps {
   supplier: Supplier
@@ -29,7 +29,7 @@ export function SupplierCard({ supplier, onClick }: SupplierCardProps) {
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 mb-1">
               <h3 className="font-semibold truncate">{supplier.name}</h3>
-              {supplier.pendingPayment > 0 && (
+              {(supplier.totalPurchases - supplier.paidPayment) > 0 && (
                 <Badge variant="outline" className="bg-red-100 text-red-800 border-red-300 shrink-0">
                   Due
                 </Badge>
@@ -54,8 +54,8 @@ export function SupplierCard({ supplier, onClick }: SupplierCardProps) {
               </div>
               <div className="text-right">
                 <p className="text-muted-foreground">Payable</p>
-                <p className={`font-semibold ${supplier.pendingPayment > 0 ? "text-red-600" : "text-green-600"}`}>
-                  Rs. {supplier.pendingPayment.toLocaleString()}
+                <p className={`font-semibold ${supplier.totalPurchases - supplier.paidPayment > 0 ? "text-red-600" : "text-green-600"}`}>
+                  Rs. {(supplier.totalPurchases - supplier.paidPayment).toLocaleString()}
                 </p>
               </div>
             </div>

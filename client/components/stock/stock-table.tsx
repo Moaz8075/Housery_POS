@@ -1,12 +1,12 @@
 "use client"
 
-import type { StockItem } from "@/lib/types"
 import { getStockItemDisplay, getCategoryName, getBrandName, getTypeName, getSizeName } from "@/lib/data-store"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Edit, Trash2, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { StockItem } from "@/lib/dataProvider"
 
 interface StockTableProps {
   items: StockItem[]
@@ -43,12 +43,12 @@ export function StockTable({ items, onEdit, onDelete }: StockTableProps) {
             items.map((item) => {
               const isLowStock = item.quantityInDozen <= item.lowStockThreshold
               return (
-                <TableRow key={item.id} className={cn(isLowStock && "bg-yellow-50/50")}>
+                <TableRow key={item._id} className={cn(isLowStock && "bg-yellow-50/50")}>
                   <TableCell className="font-medium">{getStockItemDisplay(item)}</TableCell>
-                  <TableCell>{getCategoryName(item.categoryId)}</TableCell>
-                  <TableCell>{getBrandName(item.brandId)}</TableCell>
-                  <TableCell>{getTypeName(item.typeId)}</TableCell>
-                  <TableCell>{getSizeName(item.sizeId)}</TableCell>
+                  <TableCell>{item.categoryId?.name}</TableCell>
+                  <TableCell>{item.brandId?.name}</TableCell>
+                  <TableCell>{item.typeId?.name ?? ''}</TableCell>
+                  <TableCell>{item.sizeId?.name ?? ''}</TableCell>
                   <TableCell className="text-right font-medium">{item.quantityInDozen}</TableCell>
                   <TableCell className="text-right">Rs. {item.pricePerDozen.toLocaleString()}</TableCell>
                   <TableCell className="text-right">Rs. {item.pricePerPiece.toLocaleString()}</TableCell>
