@@ -5,9 +5,14 @@ import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
-import routes from "./routes/routes.js"; // your unified routes file
+import routes from "./routes/routes.js"; // unified routes
 
-dotenv.config();
+// Load env based on NODE_ENV
+if (process.env.NODE_ENV === "production") {
+  dotenv.config({ path: ".env.production" });
+} else {
+  dotenv.config({ path: ".env" });
+}
 
 const app = express();
 
@@ -15,15 +20,16 @@ const app = express();
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-app.use(morgan("dev"));
+app.use(morgan(process.env.NODE_ENV === "production" ? "common" : "dev"));
 
 // Connect to MongoDB
-connectDB(process.env.MONGODB_URI || "mongodb://localhost:27017/housery_pos");
+const mongoURI = process.env.MONGODB_URI || "mongodb://localhost:27017/housery_pos";
+connectDB(mongoURI);
 
 // API routes
 app.use("/api", routes);
 
-// Health check route
+// Health check
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
@@ -32,8 +38,8 @@ app.get("/api/health", (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
-// Start the server
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`✅ Server running on http://localhost:${PORT} in ${process.env.NODE_ENV} mode`);
 });

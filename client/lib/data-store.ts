@@ -46,45 +46,6 @@ export const sizes: Size[] = [
 
 // Stock Items
 export const stockItems: StockItem[] = [
-  {
-    id: "stock-1",
-    categoryId: "cat-1",
-    brandId: "brand-1",
-    typeId: "type-1",
-    sizeId: "size-1",
-    quantityInDozen: 25,
-    pricePerDozen: 1200,
-    pricePerPiece: 100,
-    lowStockThreshold: 10,
-    createdAt: new Date("2024-01-15"),
-    updatedAt: new Date("2024-01-15"),
-  },
-  {
-    id: "stock-2",
-    categoryId: "cat-1",
-    brandId: "brand-1",
-    typeId: "type-1",
-    sizeId: "size-2",
-    quantityInDozen: 5,
-    pricePerDozen: 1200,
-    pricePerPiece: 100,
-    lowStockThreshold: 10,
-    createdAt: new Date("2024-01-15"),
-    updatedAt: new Date("2024-01-15"),
-  },
-  {
-    id: "stock-3",
-    categoryId: "cat-1",
-    brandId: "brand-2",
-    typeId: "type-3",
-    sizeId: "size-1",
-    quantityInDozen: 30,
-    pricePerDozen: 1500,
-    pricePerPiece: 125,
-    lowStockThreshold: 8,
-    createdAt: new Date("2024-01-15"),
-    updatedAt: new Date("2024-01-15"),
-  },
 ]
 
 // Customers
@@ -140,47 +101,7 @@ export const suppliers: Supplier[] = [
   },
 ]
 
-// Transactions
-export const transactions: Transaction[] = [
-  {
-    id: "trans-1",
-    type: "sale",
-    customerId: "cust-1",
-    amount: 15000,
-    amountPaid: 3000,
-    amountPending: 12000,
-    items: [
-      {
-        stockItemId: "stock-1",
-        quantityInDozen: 10,
-        pricePerDozen: 1200,
-        pricePerPiece: 100,
-        totalAmount: 12000,
-      },
-    ],
-    createdAt: new Date("2024-01-20"),
-    dueDate: new Date("2024-02-20"),
-  },
-  {
-    id: "trans-2",
-    type: "sale",
-    customerId: "cust-3",
-    amount: 25000,
-    amountPaid: 0,
-    amountPending: 25000,
-    items: [
-      {
-        stockItemId: "stock-3",
-        quantityInDozen: 15,
-        pricePerDozen: 1500,
-        pricePerPiece: 125,
-        totalAmount: 22500,
-      },
-    ],
-    createdAt: new Date("2024-01-18"),
-    dueDate: new Date("2024-02-15"),
-  },
-]
+
 
 // Payments
 export const payments: Payment[] = [
