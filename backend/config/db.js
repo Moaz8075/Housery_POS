@@ -1,15 +1,13 @@
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
 
 const connectDB = async (uri) => {
   try {
-    const conn = await mongoose.connect(uri, {
-      // connection options are auto-handled in mongoose v6+
-    });
+    const conn = await mongoose.connect(uri);
     console.log(`MongoDB connected: ${conn.connection.host}`);
   } catch (err) {
-    console.error('MongoDB connection error:', err.message);
+    console.error("MongoDB connection error:", err.message);
     process.exit(1);
   }
 };
 
-module.exports = connectDB;
+export default connectDB;
